@@ -1,5 +1,8 @@
 # ---- Python bytecode ----
-dockfleet/health/__pycache__/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 
 # ---- Virtual environments ----
 .env
@@ -14,3 +17,21 @@ venv.bak/
 *.sqlite
 *.sqlite3
 *.db
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Pytest
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/

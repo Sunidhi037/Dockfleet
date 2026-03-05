@@ -14,14 +14,11 @@ templates = Jinja2Templates(directory="dockfleet/dashboard/templates")
 class Service(BaseModel):
     name: str
     status: str
-    cpu: int          
-    memory: int       
-    uptime: str
+    image: str
+    ports: str
+    restart_policy: str
     restart_count: int
-    health_status: str
-
-
-
+    
 @router.get("/health")
 def health_check():
     return {"status": "ok"}

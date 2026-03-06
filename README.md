@@ -9,13 +9,12 @@
 Managing multiple containers on a single machine is difficult:
 
 - Services crash silently
-  
+
 - Manual restarts are required
-  
+
 - Monitoring is scattered
-  
+
 - Kubernetes is too heavy for small setups
-  
 
 ---
 
@@ -24,32 +23,30 @@ Managing multiple containers on a single machine is difficult:
 DockFleet provides simple orchestration with built-in self-healing:
 
 - Deploy stacks from YAML
-  
+
 - Monitor service health continuously
-  
+
 - Restart unhealthy containers automatically
-  
+
 - View system status in real time
-  
 
 ---
 
 ## <u>Key Features</u>
 
 - One file to define all services
-  
+
 - One command to run the entire system
-  
+
 - Automatically fixes crashed services
-  
+
 - Real-time monitoring dashboard
-  
+
 - Resource usage tracking
-  
+
 - Centralized logs
-  
+
 - Fully offline and local
-  
 
 ---
 
@@ -58,11 +55,10 @@ DockFleet provides simple orchestration with built-in self-healing:
 #### 1. Requirements
 
 - Python 3.10+ installed
-  
+
 - Git installed
-  
+
 - Docker installed and running (for later phases)
-  
 
 Check Python:
 
@@ -161,6 +157,60 @@ http://localhost:8080
 
 ---
 
+## Quick Start
+
+Run DockFleet using the CLI commands.
+
+### 1. Validate configuration
+
+```
+dockfleet validate examples/dockfleet.yaml
+```
+
+Checks whether the YAML configuration is valid.
+
+---
+
+### 2. Seed service health database
+
+```
+dockfleet seed examples/dockfleet.yaml
+```
+
+Initializes the database and registers services for health monitoring.
+
+---
+
+### 3. Start services
+
+```
+dockfleet up examples/dockfleet.yaml
+```
+
+Starts all services defined in the configuration file.
+
+---
+
+### 4. Check running services
+
+```
+dockfleet ps
+```
+
+Displays currently running containers managed by DockFleet.
+
+---
+
+### 5. Stop services
+
+```
+dockfleet down examples/dockfleet.yaml
+```
+
+Stops and removes all containers defined in the configuration.
+
+---
+
 ### <u>Tech Stack</u>
 
 ### Backend
@@ -182,11 +232,11 @@ http://localhost:8080
 
 ## <u>Why DockFleet Matters</u>
 
-| Tool | Limitation |
-| --- | --- |
-| Docker Compose | No intelligent self‑healing |
-| Kubernetes | Too complex for small deployments |
-| Cloud platforms | Require external services |
+| Tool            | Limitation                        |
+| --------------- | --------------------------------- |
+| Docker Compose  | No intelligent self‑healing       |
+| Kubernetes      | Too complex for small deployments |
+| Cloud platforms | Require external services         |
 
 DockFleet delivers production‑grade reliability without heavy infrastructure.
 
@@ -195,24 +245,23 @@ DockFleet delivers production‑grade reliability without heavy infrastructure.
 ## <u>Use Cases</u>
 
 - VPS deployments
-  
+
 - Development environments
-  
+
 - Self-hosted applications
-  
+
 - Small production stacks
-  
 
 ---
 
 ## <u>Team</u>
 
-| Name | Role |
-| --- | --- |
-| [Aayush Kumar Jha](https://github.com/AayushJha31) | Orchestration Engine |
-| [Pratyush Jha](https://github.com/pratyushjha06) | Health & State System |
-| [Sunidhi Singh](https://github.com/Sunidhi037) | CLI & Config System |
-| [Khushi Kumari](https://github.com/Khushi5155) | Dashboard & Backend |
+| Name                                               | Role                  |
+| -------------------------------------------------- | --------------------- |
+| [Aayush Kumar Jha](https://github.com/AayushJha31) | Orchestration Engine  |
+| [Pratyush Jha](https://github.com/pratyushjha06)   | Health & State System |
+| [Sunidhi Singh](https://github.com/Sunidhi037)     | CLI & Config System   |
+| [Khushi Kumari](https://github.com/Khushi5155)     | Dashboard & Backend   |
 
 ---
 

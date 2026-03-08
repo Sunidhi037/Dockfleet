@@ -1,0 +1,59 @@
+from sqlmodel import Session, select
+from dockfleet.health.models import init_db, Service, engine
+from dockfleet.health.services import seed_services
+from dockfleet.health.status import update_service_health
+from dockfleet.cli.config import load_config, DockFleetConfig
+
+
+def test_consecutive_failures_and_status_transitions(tmp_path):
+    """
+    sanity check on update_service_health:
+    Cycle 1: healthy  -> status='running',  consecutive_failures=0, restart_count unchanged
+    Cycle 2: unhealthy -> status='unhealthy', consecutive_failures=1, restart_count +1
+    Cycle 3: unhealthy -> status='unhealthy', consecutive_failures=2, restart_count +2
+    """
+    # 1) Fresh DB schema
+    init_db()
+
+    # 2) Load config + seed
+    config_path = "examples/dockfleet.yaml"
+    config: DockFleetConfig = load_config(config_path)
+
+    with Session(engine) as session:
+        seed_services(config, session)
+
+    service_name = list(config.services.keys())[0]
+
+    # Helper to fetch fresh row
+    def get_service():
+        with Session(engine) as session_local:
+            return session_local.exec(
+                select(Service).where(Service.name == service_name)
+            ).one()
+
+    # Baseline (after seed)
+    baseline = get_service()
+    baseline_restart_count = baseline.restart_count
+
+    # Cycle 1: healthy
+    update_service_health(service_name, is_healthy=True, reason=None)
+    svc = get_service()
+    assert svc.status == "running"
+    assert svc.consecutive_failures == 0
+    assert svc.restart_count == baseline_restart_count
+
+    # Cycle 2: unhealthy
+    update_service_health(service_name, is_healthy=False, reason="fail 1")
+    svc = get_service()
+    assert svc.status == "unhealthy"
+    assert svc.consecutive_failures == 1
+    assert svc.restart_count == baseline_restart_count + 1
+    assert svc.last_failure_reason == "fail 1"
+
+    # Cycle 3: unhealthy again
+    update_service_health(service_name, is_healthy=False, reason="fail 2")
+    svc = get_service()
+    assert svc.status == "unhealthy"
+    assert svc.consecutive_failures == 2
+    assert svc.restart_count == baseline_restart_count + 2
+    assert svc.last_failure_reason == "fail 2"

@@ -20,6 +20,7 @@ class HealthScheduler:
         self,
         config: DockFleetConfig,
         interval_seconds: int = DEFAULT_INTERVAL_SECONDS,
+        checker: HealthChecker | None = None,
     ) -> None:
         self.config = config
         self.interval_seconds = interval_seconds
@@ -27,12 +28,12 @@ class HealthScheduler:
         self._stopped: bool = True
         self._thread: Optional[threading.Thread] = None
         self._logger = logging.getLogger(__name__)
-        self._checker = HealthChecker()
+        # allow injecting a fake checker in tests, default to real one.
+        self._checker: HealthChecker = checker or HealthChecker()
 
     def start(self) -> None:
 
         # Start the background polling thread if it's not already running.
-
         if self._thread is not None and self._thread.is_alive():
             return
 
@@ -49,7 +50,6 @@ class HealthScheduler:
     def stop(self) -> None:
 
         # Signal the polling thread to stop and wait for it to finish.
-
         self._stopped = True
 
         if self._thread is not None and self._thread.is_alive():
@@ -105,9 +105,7 @@ class HealthScheduler:
         self._logger.info("HealthScheduler: poll loop exiting")
 
     def _run_single_check(self, name: str, hc: HealthCheckConfig) -> bool:
-
         # Run one health check based on its type and return True/False.
- 
         hc_type = hc.type.lower()
 
         if hc_type == "http":

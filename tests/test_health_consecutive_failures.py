@@ -7,8 +7,7 @@ from dockfleet.cli.config import load_config, DockFleetConfig
 
 def test_consecutive_failures_and_status_transitions(tmp_path):
     """
-    Day 10 sanity check on update_service_health:
-
+    sanity check on update_service_health:
     Cycle 1: healthy  -> status='running',  consecutive_failures=0, restart_count unchanged
     Cycle 2: unhealthy -> status='unhealthy', consecutive_failures=1, restart_count +1
     Cycle 3: unhealthy -> status='unhealthy', consecutive_failures=2, restart_count +2

@@ -70,7 +70,7 @@ def stream_service_logs(service: str):
 @router.get("/status")
 def system_status():
 
-    services = fetch_services()
+    services = get_services_from_db_or_mock()
 
     total = len(services)
 
@@ -87,4 +87,5 @@ def system_status():
         "running": running,
         "stopped": stopped
     }
+
     

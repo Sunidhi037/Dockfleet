@@ -19,6 +19,25 @@
 
 </head>
 
+<style>
+
+.spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid white;
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+</style>
+
 <body class="bg-gradient-to-br from-gray-100 to-gray-200
            dark:from-gray-900 dark:to-gray-800
            text-gray-900 dark:text-white

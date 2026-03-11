@@ -284,6 +284,8 @@
 
                 services: [],
                 summary: {},
+                selectedService: "",
+                logSource: null,
 
                 async init() {
 
@@ -375,6 +377,39 @@
                     console.log("Stop clicked:", name)
 
                 },
+
+                startLogs() {
+
+    if (!this.selectedService) {
+        alert("Select a service first")
+        return
+    }
+
+    // close previous stream
+    if (this.logSource) {
+        this.logSource.close()
+    }
+
+    // clear logs
+    this.$refs.logBox.innerHTML = ""
+
+    // connect to SSE endpoint
+    this.logSource = new EventSource(`/logs/${this.selectedService}`)
+
+    this.logSource.onmessage = (event) => {
+
+        const line = document.createElement("div")
+
+        line.textContent = event.data
+
+        this.$refs.logBox.appendChild(line)
+
+        this.$refs.logBox.scrollTop =
+            this.$refs.logBox.scrollHeight
+
+    }
+
+},
 
                 toggleDarkMode() {
 

@@ -35,6 +35,28 @@ def mark_restart_failed(name: str, reason: str) -> None:
     orch = get_orchestrator()
     orch._mark_restart_failed(name, reason)
 
+def get_container_name(service_name: str) -> str:
+    """Shared container name helper for logs."""
+    return f"dockfleet_{service_name}"
+
+def get_logs(service_name: str, lines: int = 100, follow: bool = False) -> str:
+    """ Docker logs wrapper for SSE layer."""
+    container_name = get_container_name(service_name)
+    
+    cmd = ["docker", "logs", container_name, "--tail", str(lines)]
+    if follow:
+        cmd.append("-f")
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        return result.stdout
+    except subprocess.TimeoutExpired:
+        logger.warning(f"Logs timeout for {container_name}")
+        return f"Timeout fetching logs for {container_name}"
+    except Exception as e:
+        logger.error(f"Failed to get logs for {container_name}: {e}")
+        return f"Error: {e}"
+
 class Orchestrator:
 
     def __init__(self, config, self_healing: bool = True):

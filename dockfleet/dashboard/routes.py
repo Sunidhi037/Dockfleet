@@ -2,12 +2,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from dockfleet.dashboard.services import get_services_from_db_or_mock
+from dockfleet.core.logs import stream_container_logs
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
 from typing import Optional
-import time
-import json
 
 router = APIRouter()
 
@@ -43,30 +42,6 @@ def list_services():
     """
     return get_services_from_db_or_mock()
 
-
-
-
-@router.get("/logs/{service}")
-def stream_service_logs(service: str):
-
-    def event_generator():
-        counter = 1
-        while True:
-            log_data = {
-                "service": service,
-                "message": f"Log entry {counter} from {service}",
-                "level": "INFO"
-            }
-
-            yield f"data: {json.dumps(log_data)}\n\n"
-            counter += 1
-            time.sleep(2)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream"
-    )
-
 @router.get("/status")
 def system_status():
 
@@ -92,5 +67,19 @@ def system_status():
         "restarting": restarting,
         "stopped": stopped
     }
-    
+
+@router.get("/logs/{service}")
+async def stream_logs(service: str):
+    """
+    Stream container logs to browser using Server Sent Events (SSE)
+    """
+
+    # For now service name = container name
+    container_name = f"dockfleet_{service}"
+
+    def event_stream():
+        for line in stream_container_logs(container_name):
+            yield f"data: {line}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream") 
     

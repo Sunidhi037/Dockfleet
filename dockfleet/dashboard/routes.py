@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from dockfleet.dashboard.services import get_services_from_db_or_mock
+from dockfleet.dashboard.services import get_services
 from dockfleet.core.logs import stream_container_logs
 from pydantic import BaseModel
 from typing import List
@@ -37,15 +37,15 @@ def dashboard_home(request: Request):
 @router.get("/services")
 def list_services():
     """
-    Return service health information.
-    Currently mocked for Day 10.
+    Return services combining DB + Docker status.
     """
-    return get_services_from_db_or_mock()
+    return get_services()
+
 
 @router.get("/status")
 def system_status():
 
-    services = get_services_from_db_or_mock()
+    services = get_services()
 
     total = len(services)
 

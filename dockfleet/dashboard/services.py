@@ -6,15 +6,13 @@ from dockfleet.health.models import Service as DBService, engine
 
 
 def get_services():
-    """
-    Combine SQLite service data with docker container status.
-    """
 
     services = {}
 
-    # -------------------------
-    # Step 1 — Load from SQLite
-    # -------------------------
+    # -------------------
+    # Load services from DB
+    # -------------------
+
     with Session(engine) as session:
 
         db_services = session.exec(select(DBService)).all()
@@ -23,22 +21,28 @@ def get_services():
 
             services[svc.name] = {
                 "name": svc.name,
-                "status": svc.status or "unknown",
+                "status": svc.status or "stopped",
                 "health_status": svc.health_status or "unknown",
                 "image": svc.image,
                 "ports": svc.ports_raw,
                 "restart_policy": svc.restart_policy,
                 "restart_count": svc.restart_count,
                 "last_health_check": svc.last_health_check,
+
+                # new runtime fields
+                "cpu": "0%",
+                "memory": "0MB",
+                "uptime": "unknown",
             }
 
-    # -------------------------
-    # Step 2 — Enrich with Docker
-    # -------------------------
+    # -------------------
+    # Fetch runtime stats
+    # -------------------
+
     try:
 
         result = subprocess.run(
-            ["docker", "ps", "--format", "{{json .}}"],
+            ["docker", "stats", "--no-stream", "--format", "{{json .}}"],
             capture_output=True,
             text=True
         )
@@ -50,20 +54,47 @@ def get_services():
 
             container = json.loads(line)
 
+            name = container.get("Name")
+
+            if name.startswith("dockfleet_"):
+                name = name.replace("dockfleet_", "")
+
+            if name in services:
+
+                services[name]["cpu"] = container.get("CPUPerc")
+                services[name]["memory"] = container.get("MemUsage")
+
+    except Exception as e:
+        print("Docker stats failed:", e)
+
+    # -------------------
+    # Fetch container status
+    # -------------------
+
+    try:
+
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{json .}}"],
+            capture_output=True,
+            text=True
+        )
+
+        for line in result.stdout.splitlines():
+
+            container = json.loads(line)
+
             name = container.get("Names")
 
             if name.startswith("dockfleet_"):
                 name = name.replace("dockfleet_", "")
 
-            # if service exists in DB
             if name in services:
 
                 services[name]["status"] = "running"
-                services[name]["image"] = container.get("Image")
-                services[name]["ports"] = container.get("Ports")
+                services[name]["uptime"] = container.get("RunningFor")
 
     except Exception as e:
-
-        print("Docker fetch failed:", e)
+        print("Docker ps failed:", e)
 
     return list(services.values())
+    

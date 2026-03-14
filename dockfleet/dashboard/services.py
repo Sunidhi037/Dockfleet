@@ -22,7 +22,7 @@ def get_services():
             services[svc.name] = {
                 "name": svc.name,
                 "status": svc.status or "stopped",
-                "health_status": svc.health_status or "unknown",
+                "health_status": svc.status or "unknown",
                 "image": svc.image,
                 "ports": svc.ports_raw,
                 "restart_policy": svc.restart_policy,

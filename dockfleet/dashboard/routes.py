@@ -1,3 +1,4 @@
+import subprocess
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -41,7 +42,30 @@ def list_services():
     """
     return get_services()
 
+@router.post("/services/{name}/restart")
+def restart_service(name: str):
 
+    container = f"dockfleet_{name}"
+
+    subprocess.run(
+        ["docker", "restart", container],
+        capture_output=True
+    )
+
+    return {"message": f"{name} restarted"}
+
+@router.post("/services/{name}/stop")
+def stop_service(name: str):
+
+    container = f"dockfleet_{name}"
+
+    subprocess.run(
+        ["docker", "stop", container],
+        capture_output=True
+    )
+
+    return {"message": f"{name} stopped"}
+    
 @router.get("/status")
 def system_status():
 

@@ -5,6 +5,11 @@ from dockfleet.health.status import (
     mark_restart_successful,
     record_restart_event
 )
+from dockfleet.core.docker_flags import (
+    build_port_flags,
+    build_env_flags,
+    build_resource_flags
+)
 import subprocess
 import re
 from dockfleet.health.models import Service, engine
@@ -88,16 +93,25 @@ class Orchestrator:
     def start_service(self, name, svc):
 
         container_name = self.container_name(name)
-        ports = svc.ports or []
 
         try:
 
             self.docker.remove_container(container_name)
 
+            # Convert service config → dict
+            service_config = svc.model_dump() if hasattr(svc, "model_dump") else svc.__dict__
+
+            # Build Docker CLI flags
+            port_flags = build_port_flags(service_config)
+            env_flags = build_env_flags(service_config)
+            resource_flags = build_resource_flags(service_config)
+
+            docker_flags = port_flags + env_flags + resource_flags
+
             self.docker.run_container(
                 image=svc.image,
                 name=container_name,
-                ports=ports,
+                flags=docker_flags,
                 network=self.network
             )
 
@@ -277,7 +291,7 @@ class Orchestrator:
             ], capture_output=True, text=True, timeout=10)
             
             if result.returncode != 0:
-                self.logger.warning("Docker stats failed")
+                logger.warning("Docker stats failed")
                 return self._get_missing_stats()
             
             lines = [line for line in result.stdout.strip().split('\n')[1:] if line.strip()]
@@ -305,7 +319,7 @@ class Orchestrator:
                     ))
         
         except Exception as e:
-            self.logger.error(f"Stats collection failed: {e}")
+            logger.error(f"Stats collection failed: {e}")
             return self._get_missing_stats()
         
         expected = [f"dockfleet_{name}" for name in self.config.services]

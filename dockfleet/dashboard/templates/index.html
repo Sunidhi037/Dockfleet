@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <title>DockFleet Dashboard</title>
     <script>
-    if (localStorage.theme === 'dark') {
-    document.documentElement.classList.add('dark')
-    }
+        if (localStorage.theme === 'dark') {
+            document.documentElement.classList.add('dark')
+        }
     </script>
 
     <!-- Tailwind -->
@@ -90,6 +90,46 @@
                 <span class="w-3 h-3 rounded-full bg-red-500"></span>
                 Stopped
             </span>
+
+        </div>
+
+        <!-- ADVANCED CONFIG FEATURES (Day 18) -->
+        <div class="mb-10 p-6 rounded-2xl
+            bg-blue-50 dark:bg-blue-900/20
+            border border-blue-200 dark:border-blue-800
+            shadow">
+
+            <h2 class="text-lg font-semibold mb-3">
+                DockFleet Configuration Features
+            </h2>
+
+            <ul class="list-disc ml-6 text-sm space-y-1">
+
+                <li>
+                    <strong>Resource Limits</strong> —
+                    Define CPU and memory limits for containers.
+                </li>
+
+                <li>
+                    <strong>Dependency Ordering</strong> —
+                    Ensure services start in the correct order.
+                </li>
+
+                <li>
+                    <strong>Environment Variables</strong> —
+                    Configure services with runtime environment values.
+                </li>
+
+                <li>
+                    <strong>YAML Configuration</strong> —
+                    All services are defined in a
+                    <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">
+                        dockfleet.yaml
+                    </code>
+                    file.
+                </li>
+
+            </ul>
 
         </div>
 
@@ -200,6 +240,17 @@
                             <strong>Memory Usage:</strong>
                             <span x-text="service.memory"></span>
                         </p>
+                        <!-- Day 18: Resource Limits -->
+                        <template x-if="service.cpu_limit || service.memory_limit">
+                            <p>
+                                <strong>Resource Limits:</strong>
+                                <span>
+                                    <span x-text="service.memory_limit || '—'"></span>
+                                    /
+                                    <span x-text="service.cpu_limit || '—'"></span> CPU
+                                </span>
+                            </p>
+                        </template>
 
                         <p>
                             <strong>Uptime:</strong>
@@ -336,7 +387,7 @@
                         document.documentElement.classList.add('dark')
                     } else {
                         document.documentElement.classList.remove('dark')
- 
+
                     }
 
                 },

@@ -33,6 +33,8 @@ def get_services():
                 "cpu": "0%",
                 "memory": "0MB",
                 "uptime": "unknown",
+                "cpu_limit": None,
+                "memory_limit": None,
             }
 
     # -------------------

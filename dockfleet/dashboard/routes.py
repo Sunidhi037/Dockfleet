@@ -8,6 +8,10 @@ from dockfleet.health.status import (
     record_manual_restart_event,
     record_manual_stop,
 )
+from fastapi import Query
+from .services import get_logs
+from sqlmodel import Session, select
+from dockfleet.health.models import LogEvent, engine
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List
@@ -116,6 +120,49 @@ def stop_service(name: str):
         "ok": ok
     }
 
+@router.get("/logs/db")
+def list_logs(
+    service_name: Optional[str] = Query(default=None),
+    q: Optional[str] = Query(default=None),
+    limit: int = Query(default=100, le=500),
+):
+    """
+    Return recent log events from DB.
+    Optional filtering by service name or search text.
+    """
+
+    with Session(engine) as session:
+
+        stmt = select(LogEvent)
+
+        if service_name:
+            stmt = stmt.where(LogEvent.service_name == service_name)
+
+        if q:
+            stmt = stmt.where(LogEvent.message.contains(q))
+
+        stmt = stmt.order_by(LogEvent.created_at.desc()).limit(limit)
+
+        rows = session.exec(stmt).all()
+
+        return [
+            {
+                "id": log.id,
+                "service_name": log.service_name,
+                "timestamp": log.created_at,
+                "level": log.level,
+                "message": log.message,
+                "source": log.source,
+            }
+            for log in rows
+        ]
+
+@router.get("/logs")
+def fetch_logs(
+    service: str = Query("all"),
+    limit: int = Query(50)
+):
+    return get_logs(service, limit)
 
 # ------------------------------------------------
 # System summary for dashboard
@@ -159,11 +206,11 @@ def system_status():
 @router.get("/logs/{service}")
 async def stream_logs(service: str):
 
-    container_name = f"dockfleet_{service}"
+   
 
-    def event_stream():
-        for line in stream_container_logs(container_name):
-            yield f"data: {line}\n\n"
+    async def event_stream():
+        async for line in stream_container_logs(service):
+            yield line
 
     return StreamingResponse(
         event_stream(),

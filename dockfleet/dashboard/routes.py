@@ -9,6 +9,7 @@ from dockfleet.health.status import (
     record_manual_stop,
 )
 from fastapi import Query
+from .services import get_logs
 from sqlmodel import Session, select
 from dockfleet.health.models import LogEvent, engine
 from pydantic import BaseModel
@@ -119,7 +120,7 @@ def stop_service(name: str):
         "ok": ok
     }
 
-@router.get("/logs")
+@router.get("/logs/db")
 def list_logs(
     service_name: Optional[str] = Query(default=None),
     q: Optional[str] = Query(default=None),
@@ -155,6 +156,13 @@ def list_logs(
             }
             for log in rows
         ]
+
+@router.get("/logs")
+def fetch_logs(
+    service: str = Query("all"),
+    limit: int = Query(50)
+):
+    return get_logs(service, limit)
 
 # ------------------------------------------------
 # System summary for dashboard

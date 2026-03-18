@@ -1,5 +1,5 @@
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, Query, Request
@@ -21,6 +21,13 @@ from dockfleet.health.logs import (
     iter_logs_as_text,
     iter_logs_as_csv,
 )
+from dockfleet.health.queries import (
+    get_most_unstable_services,
+    get_restart_history,
+    get_failure_reasons_breakdown,
+)
+from dockfleet.health.models import RestartEvent, engine
+from sqlmodel import Session, select
 
 router = APIRouter()
 
@@ -58,6 +65,24 @@ class Service(BaseModel):
 class ActionResponse(BaseModel):
     ok: bool
     message: str
+
+
+class UnstableService(BaseModel):
+    service_name: str
+    restarts: int
+    last_restart_at: Optional[datetime] = None
+
+
+class RestartEventItem(BaseModel):
+    timestamp: datetime
+    reason: str
+    previous_status: Optional[str] = None
+    new_status: Optional[str] = None
+
+
+class FailureReasonItem(BaseModel):
+    reason: str
+    count: int
 
 
 # ------------------------------------------------
@@ -280,3 +305,119 @@ async def stream_logs(service: str):
         event_stream(),
         media_type="text/event-stream",
     )
+
+@router.get("/analytics")
+def get_analytics():
+
+    # ⚠️ MOCK DATA (replace with DB later - Day 23)
+    return {
+        "unstable_services": [
+            {"name": "auth", "restart_count": 5},
+            {"name": "db", "restart_count": 3},
+            {"name": "api", "restart_count": 2},
+        ],
+        "restart_history": [
+            {"time": "10:00", "count": 2},
+            {"time": "10:05", "count": 1},
+            {"time": "10:10", "count": 3},
+        ],
+        "failure_breakdown": [
+            {"reason": "timeout", "count": 4},
+            {"reason": "crash", "count": 2},
+            {"reason": "oom", "count": 1},
+        ]
+    }
+    
+# ------------------------------------------------
+# Crash analytics endpoints
+# ------------------------------------------------
+@router.get(
+    "/analytics/unstable-services",
+    response_model=List[UnstableService],
+)
+def analytics_unstable_services(
+    limit: int = 5,
+    window_hours: int = 24,
+):
+    """
+    Return top N most unstable services (by restart count in last window_hours)
+    plus last restart timestamp for each.
+    """
+    base = get_most_unstable_services(limit=limit, window_hours=window_hours)
+
+    # Attach last_restart_at per service using RestartEvent table
+    with Session(engine) as session:
+        results: list[UnstableService] = []
+        for row in base:
+            name = row["service_name"]
+            stmt = (
+                select(RestartEvent)
+                .where(RestartEvent.service_name == name)
+                .order_by(RestartEvent.restarted_at.desc())
+                .limit(1)
+            )
+            last = session.exec(stmt).one_or_none()
+            last_ts = last.restarted_at if last is not None else None
+
+            results.append(
+                UnstableService(
+                    service_name=name,
+                    restarts=row["restarts"],
+                    last_restart_at=last_ts,
+                )
+            )
+
+    return results
+
+
+@router.get(
+    "/analytics/restart-history/{service_name}",
+    response_model=List[RestartEventItem],
+)
+def analytics_restart_history(
+    service_name: str,
+    since_hours: int = 24,
+):
+    """
+    Return recent restart events for a given service.
+    """
+    since = datetime.utcnow() - timedelta(hours=since_hours)
+    history = get_restart_history(service_name, since=since)
+
+    return [
+        RestartEventItem(
+            timestamp=item["timestamp"],
+            reason=item["reason"],
+            previous_status=item["previous_status"],
+            new_status=item["new_status"],
+        )
+        for item in history
+    ]
+
+
+@router.get(
+    "/analytics/failure-reasons/{service_name}",
+    response_model=List[FailureReasonItem],
+)
+def analytics_failure_reasons(
+    service_name: str,
+    window_hours: int = 24,
+):
+    """
+    Aggregate restart reasons for a service in the last window_hours.
+    """
+    breakdown = get_failure_reasons_breakdown(
+        service_name=service_name,
+        window_hours=window_hours,
+    )
+
+    items = sorted(
+        breakdown.items(),
+        key=lambda kv: kv[1],
+        reverse=True,
+    )
+
+    return [
+        FailureReasonItem(reason=reason, count=count)
+        for reason, count in items
+    ]

@@ -1,6 +1,5 @@
 import subprocess
 import logging
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -50,31 +49,4 @@ async def stream_container_logs(service_name: str):
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
-        logger.info("Logs stream for %s cleaned up")
-
-
-# backward compatibility for old sync callers/tests
-def stream_logs(service_name: str):
-    """Sync wrapper: returns an iterator of plain log lines (no SSE formatting)."""
-
-    container = f"dockfleet_{service_name}"
-    cmd = ["docker", "logs", "--tail", "100", container]
-
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if result.returncode != 0:
-            logger.error("Failed to get logs for %s", container)
-            return []
-
-        for line in result.stdout.splitlines():
-            line = line.rstrip()
-            if line:
-                yield line
-    except Exception as e:
-        logger.error("Failed to stream logs (sync) for %s: %s", container, e)
-        return []
+        logger.info("Logs stream for %s cleaned up", container)

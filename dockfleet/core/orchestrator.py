@@ -22,7 +22,7 @@ from dockfleet.health.status import (
     mark_service_stopped,
     record_restart_event,
 )
-
+from dockfleet.health.logs import store_log_line
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,6 @@ class ServiceStat(BaseModel):
 
 
 _orchestrator_instance = None
-
 
 def get_container_name(service_name: str) -> str:
     """Shared container name helper for logs."""
@@ -106,7 +105,6 @@ def get_logs(
 
             if persist:
                 try:
-                    from dockfleet.health.logs import store_log_line
                     store_log_line(
                         service_name,
                         clean_line,
@@ -114,7 +112,7 @@ def get_logs(
                         source="docker-logs",
                     )
                 except Exception as e:
-                    logger.warning("log store failed for %s: %s", service_name, e)           
+                    logger.warning("log store failed for %s: %s", service_name, e)
 
         process.stdout.close()
         process.wait()

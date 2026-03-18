@@ -192,6 +192,28 @@ def download_logs(service_name: str = Query(None)):
         }
     )
 
+@router.get("/analytics")
+def get_analytics():
+
+    # ⚠️ MOCK DATA (replace with DB later - Day 23)
+    return {
+        "unstable_services": [
+            {"name": "auth", "restart_count": 5},
+            {"name": "db", "restart_count": 3},
+            {"name": "api", "restart_count": 2},
+        ],
+        "restart_history": [
+            {"time": "10:00", "count": 2},
+            {"time": "10:05", "count": 1},
+            {"time": "10:10", "count": 3},
+        ],
+        "failure_breakdown": [
+            {"reason": "timeout", "count": 4},
+            {"reason": "crash", "count": 2},
+            {"reason": "oom", "count": 1},
+        ]
+    }
+    
 # ------------------------------------------------
 # System summary for dashboard
 # ------------------------------------------------

@@ -69,6 +69,11 @@
                 Logs
             </button>
 
+            <button @click="activeTab = 'analytics'; fetchAnalytics()"
+                :class="activeTab === 'analytics' ? 'text-blue-400' : ''">
+                Analytics
+            </button>
+
             <button @click="toggleDarkMode()"
                 class="px-4 py-2 rounded-xl bg-gray-800 text-white dark:bg-gray-700 hover:scale-105 transition">
                 Toggle Theme
@@ -408,6 +413,43 @@
 
         </div>
 
+        <div x-show="activeTab === 'analytics'" class="mt-16">
+
+    <h2 class="text-2xl font-bold mb-6">Analytics</h2>
+
+    <!-- Most Unstable Services -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow mb-6">
+        <h3 class="text-lg font-semibold mb-3">Most Unstable Services</h3>
+
+        <template x-for="svc in analytics.unstable_services" :key="svc.name">
+            <div class="flex justify-between border-b py-2">
+                <span x-text="svc.name"></span>
+                <span class="font-bold text-red-500"
+                      x-text="svc.restart_count"></span>
+            </div>
+        </template>
+    </div>
+
+    <!-- Restart History Placeholder -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow mb-6">
+        <h3 class="text-lg font-semibold mb-3">Restart History</h3>
+
+        <div class="h-40 flex items-center justify-center text-gray-400">
+            📊 Chart coming tomorrow
+        </div>
+    </div>
+
+    <!-- Failure Breakdown Placeholder -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
+        <h3 class="text-lg font-semibold mb-3">Failure Breakdown</h3>
+
+        <div class="h-40 flex items-center justify-center text-gray-400">
+            📊 Pie chart coming tomorrow
+        </div>
+    </div>
+
+</div>
+
     </div>
 
 
@@ -447,6 +489,11 @@
                     }
 
                 },
+                analytics: {
+    unstable_services: [],
+    restart_history: [],
+    failure_breakdown: []
+},
 
                 async fetchLogs() {
     let url = `/logs?service_name=${this.selectedService}`;
@@ -483,6 +530,15 @@
 
 
                 },
+
+                async fetchAnalytics() {
+    try {
+        const res = await fetch("/analytics");
+        this.analytics = await res.json();
+    } catch (err) {
+        console.error("Analytics load failed", err);
+    }
+},
                 downloadLogs() {
                     let url = `/logs/download?service_name=${this.selectedService}`;
                     window.location = url;

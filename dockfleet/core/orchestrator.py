@@ -22,7 +22,7 @@ from dockfleet.health.status import (
     mark_service_stopped,
     record_restart_event,
 )
-
+from dockfleet.health.logs import store_log_line
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,6 @@ class ServiceStat(BaseModel):
 
 
 _orchestrator_instance = None
-
 
 def get_container_name(service_name: str) -> str:
     """Shared container name helper for logs."""
@@ -106,7 +105,6 @@ def get_logs(
 
             if persist:
                 try:
-                    from dockfleet.health.logs import store_log_line
                     store_log_line(
                         service_name,
                         clean_line,
@@ -114,7 +112,7 @@ def get_logs(
                         source="docker-logs",
                     )
                 except Exception as e:
-                    logger.warning("log store failed for %s: %s", service_name, e)           
+                    logger.warning("log store failed for %s: %s", service_name, e)
 
         process.stdout.close()
         process.wait()
@@ -123,10 +121,21 @@ def get_logs(
         logger.error("Failed to stream logs for %s: %s", container_name, e)
         yield f"Error: {e}"
 
+def normalize_services(services):
+    if isinstance(services, list):
+        normalized = {}
+        for svc in services:
+            name = svc.get("name")
+            if not name:
+                raise ValueError("Service missing 'name'")
+            normalized[name] = svc
+        return normalized
+    return services or {}
 
 class Orchestrator:
     def __init__(self, config, self_healing: bool = True):
         self.config = config
+        self.config.services = normalize_services(getattr(config, "services", {}))
         self.self_healing = self_healing
         self.docker = DockerManager()
         self.network = "dockfleet_net"
@@ -140,20 +149,47 @@ class Orchestrator:
         try:
             self.docker.remove_container(container_name)
 
-            # Convert service config → dict
-            service_config = (
-                svc.model_dump() if hasattr(svc, "model_dump") else svc.__dict__
-            )
+            # ✅ Convert to dict safely
+            if isinstance(svc, dict):
+                service_config = svc
+            elif hasattr(svc, "model_dump"):
+                service_config = svc.model_dump()
+            else:
+                service_config = vars(svc)
 
-            # Build Docker CLI flags
+            # ✅ VALIDATION
+            if not service_config.get("image"):
+                raise ValueError(f"Service '{name}' missing 'image'")
+
+            # ✅ DEFAULTS (fixes NoneType error)
+            service_config["env"] = service_config.get("env") or {}
+            service_config["ports"] = service_config.get("ports") or []
+
+            # 🔥 FIX env (list → dict)
+            if isinstance(service_config["env"], list):
+                env_dict = {}
+                for item in service_config["env"]:
+                    if "=" in item:
+                        k, v = item.split("=", 1)
+                        env_dict[k] = v
+                service_config["env"] = env_dict
+
+            # 🔥 FIX ports (dict → list)
+            if isinstance(service_config["ports"], dict):
+                service_config["ports"] = [
+                    f"{k}:{v}" for k, v in service_config["ports"].items()
+                ]
+
+            # ✅ Build flags safely
             port_flags = build_port_flags(service_config)
             env_flags = build_env_flags(service_config)
             resource_flags = build_resource_flags(service_config)
 
             docker_flags = port_flags + env_flags + resource_flags
 
+            # ✅ Always use service_config (not svc)
             self.docker.run_container(
-                image=svc.image,
+                image=service_config.get("image"),
                 name=container_name,
                 flags=docker_flags,
                 network=self.network,
@@ -321,23 +357,32 @@ class Orchestrator:
                 logger.error("%s marked CRASHED: %s", service_name, reason)
 
     def _resolve_service_order(self):
-        """Return services in depends_on topological order."""
         visited = set()
+        visiting = set()
         order = []
 
         def visit(name):
+            if name in visiting:
+                raise ValueError(f"Circular dependency detected: {name}")
+
             if name in visited:
                 return
 
-            visited.add(name)
+            visiting.add(name)
 
             svc = self.config.services[name]
-            deps = getattr(svc, "depends_on", []) or []
+
+            if isinstance(svc, dict):
+                deps = svc.get("depends_on", [])
+            else:
+                deps = getattr(svc, "depends_on", []) or []
 
             for dep in deps:
                 if dep in self.config.services:
                     visit(dep)
 
+            visiting.remove(name)
+            visited.add(name)
             order.append(name)
 
         for name in self.config.services:
@@ -364,6 +409,7 @@ class Orchestrator:
 
         for name in self.config.services.keys():
             self.stop_service(name)
+
 
     def ps(self):
         print("Running containers:\n")

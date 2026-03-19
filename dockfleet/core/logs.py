@@ -1,9 +1,20 @@
 import subprocess
 import logging
 import asyncio
+from dockfleet.core.orchestrator import get_container_name
+from sqlmodel import SQLModel, Field, Session, select
+from typing import Optional
+from datetime import datetime
+from dockfleet.health.models import engine
 
 logger = logging.getLogger(__name__)
 
+
+class LogEntry(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    service_name: str
+    message: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 async def stream_container_logs(service_name: str):
     """Stream Docker logs → SSE with resilience."""
@@ -78,3 +89,49 @@ def stream_logs(service_name: str):
     except Exception as e:
         logger.error("Failed to stream logs (sync) for %s: %s", container, e)
         return []
+    
+def get_logs(service_name: str, limit: int = 100):
+    """Fetch last N logs (non-streaming)"""
+
+    container = get_container_name(service_name)
+
+    try:
+        result = subprocess.run(
+            ["docker", "logs", "--tail", str(limit), container],
+            capture_output=True,
+            text=True
+        )
+
+        logs = result.stdout.strip().split("\n")
+
+        return logs
+
+    except Exception as e:
+        return [f"Error fetching logs: {str(e)}"]
+    
+MAX_LOGS_PER_SERVICE = 1000
+
+def store_log_line(service_name: str, message: str) -> None:
+    try:
+        with Session(engine) as session:
+
+            log = LogEntry(
+                service_name=service_name,
+                message=message
+            )
+            session.add(log)
+
+            old_logs = session.exec(
+                select(LogEntry)
+                .where(LogEntry.service_name == service_name)
+                .order_by(LogEntry.timestamp.desc())
+                .offset(MAX_LOGS_PER_SERVICE)
+            ).all()
+
+            for old in old_logs:
+                session.delete(old)
+
+            session.commit()
+
+    except Exception:
+        pass

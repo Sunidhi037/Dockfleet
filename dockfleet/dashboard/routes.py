@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from dockfleet.dashboard.services import get_services
+from dockfleet.core.orchestrator import get_orchestrator
 from dockfleet.core.logs import stream_container_logs
 from dockfleet.health.status import (
     record_manual_restart_event,
@@ -445,6 +446,12 @@ def analytics_restart_history(
         for item in history
     ]
 
+@router.get("/settings")
+def settings():
+    orch = get_orchestrator()
+    return {
+        "self_healing_enabled": orch.self_healing
+    }
 
 # ------------------------------------------------
 # Analytics: failure reason breakdown

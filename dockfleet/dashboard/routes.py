@@ -318,15 +318,15 @@ def download_logs(
 @router.get("/status")
 def system_status():
     services = get_services()
+
     total = len(services)
-    running = sum(1 for s in services if s["health_status"] == "healthy")
-    restarting = sum(1 for s in services if s["health_status"] == "restarting")
+
+    running = sum(1 for s in services if s["status"] == "running")
+    restarting = sum(1 for s in services if s["status"] == "restarting")
+    stopped = sum(1 for s in services if s["status"] == "stopped")
+
     unhealthy = sum(1 for s in services if s["health_status"] == "unhealthy")
-    stopped = sum(
-        1
-        for s in services
-        if s["health_status"] not in ["healthy", "restarting", "unhealthy"]
-    )
+
     return {
         "total_services": total,
         "running": running,
@@ -334,7 +334,6 @@ def system_status():
         "unhealthy": unhealthy,
         "stopped": stopped,
     }
-
 
 # ------------------------------------------------
 # Stream container logs (SSE) – NEW PATH
@@ -570,4 +569,3 @@ def analytics_failure_reasons(
         FailureReasonCount(reason=reason, count=count)
         for reason, count in items
     ]
-    

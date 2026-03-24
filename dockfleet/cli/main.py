@@ -67,14 +67,25 @@ def seed(path: Path = typer.Argument("examples/dockfleet.yaml")):
 
 @app.command()
 def up(path: Path = typer.Argument("examples/dockfleet.yaml")):
-    """Start all services defined in the DockFleet configuration."""
+    """Start all services and the health engine (self-healing mode)."""
     try:
+        # Load config
         config = load_config(path)
 
         typer.echo(f"Starting services from {path}...\n")
 
+        # Ensure DB has Service rows for this config
+        typer.echo(f"Bootstrapping health DB from {path} ...")
+        bootstrap_from_path(str(path))
+
+        # Start health scheduler in background (self-healing)
+        scheduler = HealthScheduler(config)
+        scheduler.start()
+        typer.echo("Health scheduler started (30s interval)\n")
+
+        # Start orchestrator + its own health loop
         orch = Orchestrator(config)
-        orch.up()
+        orch.up()  # blocks; scheduler keeps running in background
 
         typer.echo("\n✓ Services started")
 

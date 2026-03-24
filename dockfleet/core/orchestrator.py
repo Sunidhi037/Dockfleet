@@ -3,6 +3,7 @@ import re
 import subprocess
 from datetime import datetime
 from typing import Optional
+import time
 
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -38,6 +39,7 @@ class ServiceStat(BaseModel):
 
 
 _orchestrator_instance = None
+
 
 def get_container_name(service_name: str) -> str:
     """Shared container name helper for logs."""
@@ -121,6 +123,7 @@ def get_logs(
         logger.error("Failed to stream logs for %s: %s", container_name, e)
         yield f"Error: {e}"
 
+
 def normalize_services(services):
     if isinstance(services, list):
         normalized = {}
@@ -131,6 +134,7 @@ def normalize_services(services):
             normalized[name] = svc
         return normalized
     return services or {}
+
 
 class Orchestrator:
     def __init__(self, config, self_healing: bool = True):
@@ -157,15 +161,15 @@ class Orchestrator:
             else:
                 service_config = vars(svc)
 
-            #  VALIDATION
+            # VALIDATION
             if not service_config.get("image"):
                 raise ValueError(f"Service '{name}' missing 'image'")
 
-            #  DEFAULTS (fixes NoneType error)
+            # DEFAULTS
             service_config["env"] = service_config.get("env") or {}
             service_config["ports"] = service_config.get("ports") or []
 
-            #  FIX env (list → dict)
+            # FIX env (list → dict)
             if isinstance(service_config["env"], list):
                 env_dict = {}
                 for item in service_config["env"]:
@@ -174,20 +178,20 @@ class Orchestrator:
                         env_dict[k] = v
                 service_config["env"] = env_dict
 
-            #  FIX ports (dict → list)
+            # FIX ports (dict → list)
             if isinstance(service_config["ports"], dict):
                 service_config["ports"] = [
                     f"{k}:{v}" for k, v in service_config["ports"].items()
                 ]
 
-            #  Build flags safely
+            # Build flags safely
             port_flags = build_port_flags(service_config)
             env_flags = build_env_flags(service_config)
             resource_flags = build_resource_flags(service_config)
 
             docker_flags = port_flags + env_flags + resource_flags
 
-            #  Always use service_config (not svc)
+            # Always use service_config (not svc)
             self.docker.run_container(
                 image=service_config.get("image"),
                 name=container_name,
@@ -237,8 +241,6 @@ class Orchestrator:
             return False
 
         if backoff_attempt > 0:
-            import time
-
             delay = min(2**backoff_attempt, 32)
             logger.info(
                 "%s: backoff %ss (attempt %s)",
@@ -303,6 +305,37 @@ class Orchestrator:
 
         except Exception as e:
             logger.error("DB increment failed for %s: %s", service_name, e)
+
+    def monitor_services(self):
+        """
+        Legacy monitor; not used by dockfleet up anymore.
+        HealthScheduler is now responsible for continuous monitoring.
+        """
+        try:
+            result = subprocess.run(
+                ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}"],
+                capture_output=True,
+                text=True,
+            )
+
+            for line in result.stdout.splitlines():
+                name, status = line.split("\t")
+
+                if not name.startswith("dockfleet_"):
+                    continue
+
+                service_name = name.replace("dockfleet_", "")
+
+                if "Exited" in status:
+                    logger.warning("%s detected as crashed (%s)", service_name, status)
+
+                    self.handle_unhealthy_service(
+                        service_name,
+                        reason="health failure",
+                    )
+
+        except Exception as e:
+            logger.error("Monitor failed: %s", e)
 
     def handle_unhealthy_service(
         self,
@@ -391,25 +424,35 @@ class Orchestrator:
         return order
 
     def up(self):
+        """
+        Start all services once and return.
+
+        Continuous monitoring and self-healing are handled by HealthScheduler;
+        this method should not block.
+        """
         print("Starting services...\n")
 
+        # Ensure DB has Service rows for this config
         bootstrap_from_config(self.config)
         print(" DB bootstrapped & services seeded")
 
+        # Create network (idempotent)
         self.docker.create_network(self.network)
 
+        # Start services in dependency order
         order = self._resolve_service_order()
 
         for name in order:
             svc = self.config.services[name]
             self.start_service(name, svc)
 
+        print("All services started.")
+
     def down(self):
         print("Stopping services...\n")
 
         for name in self.config.services.keys():
             self.stop_service(name)
-
 
     def ps(self):
         print("Running containers:\n")

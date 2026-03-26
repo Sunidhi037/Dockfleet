@@ -1,13 +1,11 @@
 import subprocess
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
-
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
-
 from dockfleet.dashboard.services import get_services
 from dockfleet.core.orchestrator import get_orchestrator
 from dockfleet.core.logs import stream_container_logs, get_logs_services
@@ -346,7 +344,11 @@ def system_status():
     running = sum(1 for s in services if s["status"] == "running")
     restarting = sum(1 for s in services if s["status"] == "restarting")
     stopped = sum(1 for s in services if s["status"] == "stopped")
-    unhealthy = sum(1 for s in services if s["health_status"] == "unhealthy")
+
+    # Treat both 'unhealthy' and 'crashed' as unhealthy in the summary
+    unhealthy = sum(
+        1 for s in services if s.get("health_status") in ("unhealthy", "crashed")
+    )
 
     return {
         "total_services": total,
@@ -404,12 +406,15 @@ def get_metrics():
     services = get_services()
 
     total = len(services)
-    running = sum(1 for s in services if s["health_status"] == "healthy")
-    unhealthy = sum(1 for s in services if s["health_status"] == "unhealthy")
+    running = sum(1 for s in services if s.get("health_status") == "healthy")
+    unhealthy = sum(
+        1 for s in services if s.get("health_status") in ("unhealthy", "crashed")
+    )
     stopped = sum(
         1
         for s in services
-        if s["health_status"] not in ["healthy", "restarting", "unhealthy"]
+        if s.get("health_status")
+        not in ("healthy", "restarting", "unhealthy", "crashed")
     )
     total_restarts = sum(s.get("restart_count", 0) for s in services)
 

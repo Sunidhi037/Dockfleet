@@ -458,8 +458,16 @@ def analytics_summary(
     base = get_most_unstable_services(limit=limit, window_hours=window_hours)
 
     with Session(engine) as session:
+        # All restarts in window
         stmt_total = select(RestartEvent).where(RestartEvent.restarted_at >= since)
-        total_restarts = len(session.exec(stmt_total).all())
+        all_events = session.exec(stmt_total).all()
+        total_restarts = len(all_events)
+
+        # Only health-check-triggered restarts (reason contains "health")
+        health_events = [
+            ev for ev in all_events if ev.reason and "health" in ev.reason.lower()
+        ]
+        total_health_failures = len(health_events)
 
         unstable: list[UnstableService] = []
         for row in base:
@@ -482,7 +490,7 @@ def analytics_summary(
     return AnalyticsSummary(
         window_hours=window_hours,
         total_restarts=total_restarts,
-        total_health_failures=total_restarts,
+        total_health_failures=total_health_failures,
         most_unstable_services=unstable,
     )
 

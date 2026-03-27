@@ -31,7 +31,7 @@ def store_log_line(
         event = LogEvent(
             service_id=svc.id,
             service_name=svc.name,
-            created_at=datetime.utcnow(),
+            created_at=datetime.utcnow().isoformat(),
             level=level,
             message=message,
             source=source,

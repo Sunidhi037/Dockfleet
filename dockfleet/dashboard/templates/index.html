@@ -421,7 +421,7 @@
                     <button @click="liveScroll=!liveScroll"
                         :class="liveScroll?'bg-purple-600 text-white':'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'"
                         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                        <span x-text="liveScroll?'⬇ Auto-Scroll ON':'Auto-Scroll OFF'"></span>
+                        <span x-text="liveScroll?' Auto-Scroll ON':'Auto-Scroll OFF'"></span>
                     </button>
                     <template x-if="liveSrc">
                         <div class="flex items-center gap-1.5 text-sm text-green-500"><span

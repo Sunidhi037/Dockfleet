@@ -60,7 +60,7 @@ def get_services():
             status_raw = container.get("Status", "")
 
             # -------------------
-            # 🔥 Normalize status
+            # Normalize status
             # -------------------
             if "Up" in status_raw:
                 status = "running"
@@ -74,13 +74,16 @@ def get_services():
             services[service_name]["status"] = status
             services[service_name]["uptime"] = container.get("RunningFor")
 
-            # 🔥 sync health_status with real state
+            # sync health_status with real state, but preserve "crashed"
             if status == "running":
                 services[service_name]["health_status"] = "healthy"
             elif status == "restarting":
                 services[service_name]["health_status"] = "restarting"
             elif status == "stopped":
-                services[service_name]["health_status"] = "stopped"
+                # only downgrade to "stopped" if we don't already know it's crashed
+                if services[service_name]["health_status"] not in ("crashed",):
+                    services[service_name]["health_status"] = "stopped"
+
 
     except Exception as e:
         print("Docker ps -a failed:", e)

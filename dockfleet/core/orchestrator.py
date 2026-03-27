@@ -213,6 +213,11 @@ class Orchestrator:
         config=None,
         backoff_attempt: int = 0,
     ) -> bool:
+        """
+        Restart a service container, even if the previous container is already gone.
+
+        Used by HealthScheduler auto-heal path.
+        """
         config = config or self.config
 
         if not self.self_healing:
@@ -241,30 +246,17 @@ class Orchestrator:
 
         logger.info("Restarting %s", service_name)
 
-        container_name = self.container_name(service_name)
-        try:
-            result = subprocess.run(
-                [
-                    "docker",
-                    "ps",
-                    "--filter",
-                    f"name={container_name}",
-                    "--format",
-                    "{{.Names}}",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if not result.stdout.strip():
-                logger.info("%s not running, skipping", service_name)
-                return False
-        except Exception:
-            logger.warning("Cannot check %s, skipping", service_name)
-            return False
-
+        # Best-effort stop; ok if container is already gone
         try:
             self.stop_service(service_name)
+        except Exception as e:
+            logger.info(
+                "%s stop skipped/failed (already down or missing): %s",
+                service_name,
+                e,
+            )
+
+        try:
             self._increment_restart_count(service_name)
             self.start_service(service_name, svc)
 
@@ -367,18 +359,18 @@ class Orchestrator:
                 logger.warning("Service %s not found after restart", service_name)
 
     def _mark_restart_failed(self, service_name: str, reason: str) -> None:
-            with Session(engine) as session:
-                svc = session.exec(
-                    select(Service).where(Service.name == service_name)
-                ).one_or_none()
-                if svc:
-                    # Container is not running and health is bad
-                    svc.status = "stopped"
-                    svc.health_status = "crashed"
-                    svc.last_failure_reason = f"auto-restart failed: {reason}"
-                    session.add(svc)
-                    session.commit()
-                    logger.error("%s marked CRASHED: %s", service_name, reason)
+        with Session(engine) as session:
+            svc = session.exec(
+                select(Service).where(Service.name == service_name)
+            ).one_or_none()
+            if svc:
+                # Container is not running and health is bad
+                svc.status = "stopped"
+                svc.health_status = "crashed"
+                svc.last_failure_reason = f"auto-restart failed: {reason}"
+                session.add(svc)
+                session.commit()
+                logger.error("%s marked CRASHED: %s", service_name, reason)
 
     def _resolve_service_order(self):
         visited = set()

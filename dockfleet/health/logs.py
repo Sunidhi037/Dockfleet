@@ -15,7 +15,7 @@ def store_log_line(
     - Looks up Service by name and attaches service_id + service_name.
     - Skips insert (with a warning) if the service is not present in the DB.
     - Intended callers:
-        * CLI `dockfleet logs` path (sampling/aggregation).
+        * CLI dockfleet logs path (sampling/aggregation).
         * SSE log streaming wrapper in the dashboard backend.
         * Orchestrator for structured events.
     """
@@ -31,7 +31,7 @@ def store_log_line(
         event = LogEvent(
             service_id=svc.id,
             service_name=svc.name,
-            created_at=datetime.utcnow(),
+            created_at=datetime.utcnow().isoformat(),
             level=level,
             message=message,
             source=source,
@@ -167,3 +167,4 @@ def iter_logs_as_csv(
             yield "\n".join(lines) + "\n"
 
         offset += batch_size
+        

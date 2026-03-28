@@ -82,3 +82,4 @@ engine = create_engine(sqlite_url)
 
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
+    

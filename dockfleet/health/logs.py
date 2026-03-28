@@ -167,3 +167,4 @@ def iter_logs_as_csv(
             yield "\n".join(lines) + "\n"
 
         offset += batch_size
+        
